@@ -1,14 +1,13 @@
 package main
 
 import (
-	"github.com/cronitorio/cronitor-cli/cmd"
-	"github.com/getsentry/raven-go"
 	"os"
+
+	"github.com/meoww-bot/cronitor-cli/cmd"
 )
 
 func init() {
-	// SetDSN
-	raven.SetRelease(cmd.Version)
+
 }
 
 func main() {
@@ -38,5 +37,5 @@ func main() {
 		os.Args[commandIndex] = "--"
 	}
 
-	raven.CapturePanicAndWait(cmd.Execute, nil)
+	cmd.Execute()
 }

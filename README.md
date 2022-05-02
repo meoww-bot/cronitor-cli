@@ -1,4 +1,31 @@
-# CronitorCLI
+# CronitorCLI Modified Version
+
+Please attention, this version isn't compatible to official cronitor.io , but to https://github.com/meoww-bot/cronitor-server self-hosted version.
+
+### before you run 
+
+```
+cp .env.example .env
+```
+
+Set API_HOST in `.env`
+
+### What I Modified
+
+- Add several additional fields for cron job `queue`() when running `cronitor discover`:
+  - Queue (return which hive queue it use if crontab job script file is related to hive, or "")
+  - CommandToRun (the whole line of cronjob)
+  - RunAs (which user run this cronjob)
+  - Host 
+- Improve `createTags` by parsing crontab job script file, now support(see `CheckMap` in `cmd/discover.go` for more details):
+  - hive
+  - oracle
+  - snowball (clickhouse)
+  - hdfs
+  - hadoop
+- Set API_HOST via `.env` file
+
+
 **Command line tools for Cronitor.io**
 
 CronitorCLI is the recommended companion application to the Cronitor monitoring service.  Use it on your workstation and deploy it to your server for powerful features, including:
@@ -15,7 +42,7 @@ For the latest installation details, see https://cronitor.io/docs/using-cronitor
 ### Usage
 
 ```
-CronitorCLI version 25.2
+CronitorCLI version 28.8
 
 Command line tools for Cronitor.io. See https://cronitor.io/docs/using-cronitor-cli for details.
 

@@ -5,27 +5,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/getsentry/raven-go"
-	"github.com/spf13/viper"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/getsentry/raven-go"
+	"github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
+type RuleValue string
+
 type Rule struct {
-	RuleType     string `json:"rule_type"`
-	Value        string `json:"value"`
-	TimeUnit     string `json:"time_unit,omitempty"`
-	GraceSeconds uint   `json:"grace_seconds,omitempty"`
+	RuleType     string    `json:"rule_type"`
+	Value        RuleValue `json:"value"`
+	TimeUnit     string    `json:"time_unit,omitempty"`
+	GraceSeconds uint      `json:"grace_seconds,omitempty"`
 }
 
 type Monitor struct {
 	Name             string              `json:"name,omitempty"`
 	DefaultName      string              `json:"defaultName"`
+	Host             string              `json:"host"`
+	CommandToRun     string              `json:"commandToRun"`
+	RunAs            string              `json:"runAs"`
 	Key              string              `json:"key"`
 	Rules            []Rule              `json:"rules"`
 	Tags             []string            `json:"tags"`
+	Queue            string              `json:"queue"`
 	Type             string              `json:"type"`
 	Code             string              `json:"code,omitempty"`
 	Timezone         string              `json:"timezone,omitempty"`
@@ -47,6 +57,21 @@ type CronitorApi struct {
 	ApiKey         string
 	UserAgent      string
 	Logger         func(string)
+}
+
+func (fi *RuleValue) UnmarshalJSON(b []byte) error {
+	if b[0] == '"' {
+		return json.Unmarshal(b, (*string)(fi))
+	}
+
+	var i int
+	if err := json.Unmarshal(b, &i); err != nil {
+		return err
+	}
+	s := strconv.Itoa(i)
+
+	*fi = RuleValue(s)
+	return nil
 }
 
 func (api CronitorApi) PutMonitors(monitors map[string]*Monitor) (map[string]*Monitor, error) {
@@ -154,11 +179,15 @@ func (api CronitorApi) GetRawResponse(url string) ([]byte, error) {
 }
 
 func (api CronitorApi) Url() string {
-	if api.IsDev {
-		return "http://dev.cronitor.io/v3/monitors"
-	} else {
-		return "https://cronitor.io/v3/monitors"
+
+	err := godotenv.Load()
+	if err != nil {
+		panic("Error loading .env file")
 	}
+
+	API_HOST := os.Getenv("API_HOST")
+
+	return API_HOST + "/v3/monitors"
 }
 
 func (api CronitorApi) sendHttpPut(url string, body string) ([]byte, error) {

@@ -1,12 +1,13 @@
 package cmd
 
 import (
-	"github.com/cronitorio/cronitor-cli/lib"
 	"fmt"
-	"github.com/manifoldco/promptui"
-	"github.com/spf13/cobra"
 	"os"
 	"os/user"
+
+	"github.com/manifoldco/promptui"
+	"github.com/meoww-bot/cronitor-cli/lib"
+	"github.com/spf13/cobra"
 )
 
 var selectCmd = &cobra.Command{

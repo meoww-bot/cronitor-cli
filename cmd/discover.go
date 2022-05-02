@@ -1,12 +1,15 @@
 package cmd
 
 import (
-	"github.com/cronitorio/cronitor-cli/lib"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/user"
+	"regexp"
 	"strings"
+
+	"github.com/meoww-bot/cronitor-cli/lib"
 
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
@@ -257,7 +260,8 @@ func processCrontab(crontab *lib.Crontab) bool {
 
 		rules := []lib.Rule{createRule(line.CronExpression)}
 		defaultName := createDefaultName(line, crontab, effectiveHostname(), excludeFromName, allNameCandidates)
-		tags := createTags()
+		// fmt.Println(line.CommandToRun)
+		tags, queue := createTags(line.CommandToRun)
 		key := line.Key(crontab.CanonicalName())
 		name := defaultName
 		skip := false
@@ -309,13 +313,25 @@ func processCrontab(crontab *lib.Crontab) bool {
 			notificationListMap = map[string][]string{"templates": {notificationList}}
 		}
 
+		runAs := line.RunAs
+
+		if runAs == "" {
+			if u, err := user.Current(); err == nil {
+				runAs = u.Username
+			}
+		}
+
 		line.Mon = lib.Monitor{
 			Name:             name,
 			DefaultName:      defaultName,
+			Host:             effectiveHostname(),
+			CommandToRun:     line.CommandToRun,
+			RunAs:            runAs,
 			Key:              key,
 			Rules:            rules,
 			Tags:             tags,
-			Type:             "heartbeat",
+			Queue:            queue,
+			Type:             "job",
 			Code:             line.Code,
 			Timezone:         timezone.Name,
 			Note:             createNote(line, crontab),
@@ -444,14 +460,76 @@ func createDefaultName(line *lib.Line, crontab *lib.Crontab, effectiveHostname s
 		strings.TrimSpace(candidate[len(candidate)-commandSuffixLen:]), lineNumSuffix)
 }
 
-func createTags() []string {
+// func createTags() []string {
+// 	var tags []string
+// 	tags = append(tags, "cron-job")
+// 	return tags
+// }
+
+func createTags(cmdstr string) ([]string, string) {
 	var tags []string
+	queue := ""
+	re, _ := regexp.Compile(`/[/\w]*\.sh`)
+	filepath := re.FindString(cmdstr)
+
+	if len(filepath) > 0 {
+		tags, queue = CheckScriptTag(filepath)
+	}
+
 	tags = append(tags, "cron-job")
-	return tags
+	return tags, queue
+}
+
+func CheckScriptTag(filename string) ([]string, string) {
+
+	var tags []string
+	queue := ""
+
+	var CheckMap = map[string][]string{
+		"hive":     {"hive"},
+		"oracle":   {"sqlldr", "sqluldr2", "sqlplus"},
+		"snowball": {"snowball"},
+		"hdfs":     {"hdfs", "hadoop dfs"},
+		"hadoop":   {"hadoop"},
+	}
+
+	// read the whole file at once
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		panic(err)
+	}
+
+	s := string(b)
+
+	for i := range CheckMap {
+
+		for j := range CheckMap[i] {
+
+			if strings.Contains(s, CheckMap[i][j]) {
+				tags = append(tags, i)
+				break
+			}
+		}
+	}
+
+	if strings.Contains(s, "hive") {
+		re := regexp.MustCompile(`tez.queue.name=([a-zA-Z0-9]*)`)
+		matches := re.FindStringSubmatch(s)
+
+		if len(matches) > 0 {
+			queue = matches[1]
+		} else if strings.Contains(s, "hive -e") {
+			queue = "default"
+		} else {
+			queue = ""
+		}
+	}
+
+	return tags, queue
 }
 
 func createRule(cronExpression string) lib.Rule {
-	return lib.Rule{"not_on_schedule", cronExpression, "", 0}
+	return lib.Rule{"not_on_schedule", lib.RuleValue(cronExpression), "", 0}
 }
 
 func validateName(candidateName string) error {

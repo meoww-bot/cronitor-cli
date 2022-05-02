@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/cronitorio/cronitor-cli/lib"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -17,13 +16,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/meoww-bot/cronitor-cli/lib"
+
 	"github.com/fatih/color"
 	"github.com/getsentry/raven-go"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var Version string = "27.1"
+var Version string = "28.8"
 
 var cfgFile string
 var userAgent string
@@ -71,7 +73,7 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 	RootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", cfgFile, "Config file")
-	RootCmd.PersistentFlags().StringVar(&environment, "env", apiKey, "Cronitor Environment")
+	RootCmd.PersistentFlags().StringVar(&environment, "env", environment, "Cronitor Environment")
 	RootCmd.PersistentFlags().StringVarP(&apiKey, "api-key", "k", apiKey, "Cronitor API Key")
 	RootCmd.PersistentFlags().StringVarP(&pingApiKey, "ping-api-key", "p", pingApiKey, "Ping API Key")
 	RootCmd.PersistentFlags().StringVarP(&hostname, "hostname", "n", hostname, "A unique identifier for this host (default: system hostname)")
@@ -179,14 +181,17 @@ func sendPing(endpoint string, uniqueIdentifier string, message string, series s
 
 	pingSent := false
 	uri := ""
+
+	err := godotenv.Load()
+	if err != nil {
+		panic("Error loading .env file")
+	}
+
+	API_HOST := os.Getenv("API_HOST")
+
 	for i := 1; i <= 6; i++ {
-		if dev {
-			pingApiHost = "http://localhost:8000"
-		} else if i > 2 && pingApiHost == "https://cronitor.link" {
-			pingApiHost = "https://cronitor.io"
-		} else {
-			pingApiHost = "https://cronitor.link"
-		}
+
+		pingApiHost = API_HOST
 
 		// After 2 failed attempts, take a brief random break before trying again
 		if i > 2 {
